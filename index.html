@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>案件進捗トラッカー</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --blue:#2563eb;--blue-l:#eff6ff;--blue-b:#bfdbfe;
+  --red:#dc2626;--red-l:#fef2f2;--red-b:#fecaca;
+  --yellow:#d97706;--yellow-l:#fffbeb;--yellow-b:#fde68a;
+  --green:#059669;--green-l:#ecfdf5;--green-b:#a7f3d0;
+  --purple:#7c3aed;--purple-l:#f5f3ff;--purple-b:#ddd6fe;
+  --gray:#374151;--gray-l:#f9fafb;--gray-b:#e5e7eb;
+  --orange:#ea580c;--orange-l:#fff7ed;--orange-b:#fed7aa;
+  --teal:#0d9488;--teal-l:#f0fdfa;--teal-b:#99f6e4;
+  --pink:#db2777;--pink-l:#fdf2f8;--pink-b:#fbcfe8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:#f8fafc;color:#1a1a1a;min-height:100vh;display:flex}
+
+/* ── サイドバー ── */
+.sidebar{width:196px;min-height:100vh;background:#fff;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:20}
+.sidebar-logo{padding:18px 16px 14px;border-bottom:1px solid #f1f5f9}
+.logo-title{font-size:15px;font-weight:600;color:#1e293b}
+.logo-sub{font-size:11px;color:#94a3b8;margin-top:2px}
+.sidebar-nav{flex:1;padding:10px 8px;overflow-y:auto}
+.nav-sec{font-size:10px;font-weight:600;color:#94a3b8;letter-spacing:.07em;padding:0 8px;margin:10px 0 4px}
+.nav-btn{display:flex;align-items:center;gap:8px;width:100%;padding:9px 10px;border:1.5px solid transparent;background:none;color:#64748b;font-size:13px;font-weight:500;cursor:pointer;border-radius:7px;font-family:inherit;text-align:left;transition:all .15s;margin-bottom:2px}
+.nav-btn:hover{background:#f8fafc;color:#1e293b}
+.nav-btn.active{font-weight:600}
+.nb-projects.active{background:var(--pink-l);color:var(--pink);border-color:var(--pink-b)}
+.nb-progress.active{background:var(--teal-l);color:var(--teal);border-color:var(--teal-b)}
+.nb-task.active{background:var(--blue-l);color:var(--blue);border-color:var(--blue-b)}
+.nb-board.active{background:var(--purple-l);color:var(--purple);border-color:var(--purple-b)}
+.nb-cal.active{background:var(--yellow-l);color:var(--yellow);border-color:var(--yellow-b)}
+.nb-nippo.active{background:var(--green-l);color:var(--green);border-color:var(--green-b)}
+.nb-manage.active{background:var(--orange-l);color:var(--orange);border-color:var(--orange-b)}
+.nav-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;opacity:.4}
+.nav-btn.active .nav-dot{opacity:1}
+.sidebar-footer{padding:10px 8px;border-top:1px solid #f1f5f9}
+.sync-pill{font-size:11px;padding:4px 10px;border-radius:999px;font-weight:500;display:block;text-align:center;border:1.5px solid transparent}
+.sync-ok{background:var(--green-l);color:var(--green);border-color:var(--green-b)}
+.sync-err{background:var(--red-l);color:var(--red);border-color:var(--red-b)}
+.sync-ing{background:var(--yellow-l);color:var(--yellow);border-color:var(--yellow-b)}
+.save-flash{font-size:11px;color:var(--green);text-align:center;display:block;margin-top:4px;opacity:0;transition:opacity .3s;height:14px}
+.save-flash.show{opacity:1}
+.last-sync-txt{font-size:10px;color:#cbd5e1;text-align:center;display:block;margin-top:3px}
+
+/* ── メイン ── */
+.main{margin-left:196px;flex:1}
+.main-pane{display:none;padding:24px}.main-pane.active{display:block}
+.pane-title{font-size:20px;font-weight:600;margin-bottom:20px;color:#0f172a}
+
+/* ── アラートバナー ── */
+.alert-banner{background:var(--red-l);border:1.5px solid var(--red-b);border-radius:9px;padding:14px 16px;margin-bottom:18px}
+.alert-banner-title{font-size:13px;font-weight:600;color:var(--red);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.alert-item{font-size:12px;color:var(--red);padding:2px 0;display:flex;align-items:center;gap:6px}
+.alert-dot{width:5px;height:5px;border-radius:50%;background:var(--red);flex-shrink:0}
+
+/* ── 案件一覧フィルター ── */
+.filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.filter-tabs{display:flex;gap:4px;background:#f1f5f9;border-radius:8px;padding:3px}
+.filter-tab{font-size:12px;font-weight:500;padding:5px 12px;border:none;background:none;color:#64748b;cursor:pointer;border-radius:6px;font-family:inherit;transition:all .15s;white-space:nowrap}
+.filter-tab.active{background:#fff;color:#0f172a;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.filter-search{font-size:13px;padding:7px 11px;border:1.5px solid #e5e7eb;border-radius:7px;background:#fff;color:#0f172a;font-family:inherit;flex:1;min-width:140px;transition:border-color .15s}
+.filter-search:focus{outline:none;border-color:var(--blue)}
+
+/* ── 案件一覧テーブル ── */
+.proj-table-wrap{overflow-x:auto;border-radius:10px;border:1.5px solid #e5e7eb;background:#fff}
+.proj-table{width:100%;border-collapse:collapse;font-size:13px;min-width:900px}
+.proj-table th{background:#f8fafc;padding:10px 12px;text-align:left;font-size:11px;font-weight:600;color:#94a3b8;letter-spacing:.05em;border-bottom:1.5px solid #e5e7eb;white-space:nowrap}
+.proj-table td{padding:11px 12px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+.proj-table tr:last-child td{border-bottom:none}
+.proj-table tr:hover td{background:#f8fafc}
+.proj-name-cell{font-weight:600;color:#0f172a}
+.proj-client{font-size:11px;color:#94a3b8;margin-top:2px}
+.days-chip{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.days-ok{background:var(--green-l);color:var(--green);border:1px solid var(--green-b)}
+.days-warn{background:var(--yellow-l);color:var(--yellow);border:1px solid var(--yellow-b)}
+.days-danger{background:var(--red-l);color:var(--red);border:1px solid var(--red-b)}
+.days-none{background:#f1f5f9;color:#94a3b8;border:1px solid #e5e7eb}
+.progress-bar-sm{height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden;width:80px}
+.progress-fill-sm{height:100%;border-radius:3px;transition:width .4s}
+.prog-label{font-size:11px;color:#64748b;margin-top:3px}
+.member-chips{display:flex;flex-wrap:wrap;gap:3px}
+.member-chip{font-size:10px;padding:1px 7px;border-radius:999px;background:#f1f5f9;color:#64748b;white-space:nowrap}
+.type-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.type-shot{background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe}
+.type-internal{background:#f5f3ff;color:#7c3aed;border:1px solid #ddd6fe}
+.type-running{background:#ecfdf5;color:#059669;border:1px solid #a7f3d0}
+.type-done{background:#f1f5f9;color:#94a3b8;border:1px solid #e5e7eb}
+.proj-status-sel{font-size:11px;padding:3px 6px;border:1.5px solid #e5e7eb;border-radius:5px;background:#fff;color:#374151;font-family:inherit;cursor:pointer;font-weight:500}
+.add-proj-btn{font-size:13px;padding:7px 16px;border:1.5px solid var(--pink-b);border-radius:7px;background:var(--pink-l);color:var(--pink);cursor:pointer;font-family:inherit;font-weight:500;transition:all .15s;white-space:nowrap}
+.add-proj-btn:hover{background:var(--pink);color:#fff}
+.tbl-act{font-size:11px;padding:2px 7px;border:1.5px solid #e5e7eb;border-radius:4px;background:#fff;color:#94a3b8;cursor:pointer;font-family:inherit;transition:all .15s}
+.tbl-act:hover{color:var(--red);border-color:var(--red-b);background:var(--red-l)}
+
+/* ── 進捗管理 ── */
+.progress-sel{font-size:13px;padding:6px 10px;border:1.5px solid #e5e7eb;border-radius:7px;background:#fff;font-family:inherit;color:#374151;margin-bottom:14px;width:280px}
+.prog-card{background:#fff;border-radius:10px;border:1.5px solid #e5e7eb;padding:18px;margin-bottom:12px}
+.prog-card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
+.prog-card-name{font-size:15px;font-weight:600;color:#0f172a}
+.prog-card-client{font-size:12px;color:#94a3b8;margin-top:2px}
+.prog-card-pct{font-size:22px;font-weight:600;color:var(--blue)}
+.kpi-list{list-style:none}
+.kpi-item{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f8fafc;cursor:pointer}
+.kpi-item:last-child{border-bottom:none}
+.kpi-item:hover .kpi-txt{color:#0f172a}
+.kpi-item.done .kpi-txt{text-decoration:line-through;color:#94a3b8}
+.kpi-chk{width:16px;height:16px;border:1.5px solid #d1d5db;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .15s}
+.kpi-item.done .kpi-chk{background:var(--green);border-color:var(--green);color:#fff}
+.kpi-txt{font-size:13px;color:#475569;flex:1}
+.kpi-weight{font-size:11px;color:#94a3b8;background:#f1f5f9;padding:1px 6px;border-radius:3px}
+.add-kpi-row{display:flex;gap:6px;margin-top:10px}
+.add-kpi-inp{flex:1;font-size:13px;padding:6px 10px;border:1.5px solid #e5e7eb;border-radius:6px;background:#fff;font-family:inherit;color:#0f172a;transition:border-color .15s}
+.add-kpi-inp:focus{outline:none;border-color:var(--blue)}
+.add-kpi-weight{width:70px;font-size:13px;padding:6px 8px;border:1.5px solid #e5e7eb;border-radius:6px;background:#fff;font-family:inherit;color:#0f172a;transition:border-color .15s}
+.add-kpi-weight:focus{outline:none;border-color:var(--blue)}
+.add-kpi-btn{font-size:12px;padding:6px 12px;border:1.5px solid var(--blue-b);border-radius:6px;background:var(--blue-l);color:var(--blue);cursor:pointer;font-family:inherit;font-weight:500;white-space:nowrap;transition:all .15s}
+.add-kpi-btn:hover{background:var(--blue);color:#fff}
+.prog-bar-lg{height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;margin:10px 0 6px}
+.prog-fill-lg{height:100%;border-radius:4px;background:var(--blue);transition:width .5s}
+.no-proj-msg{text-align:center;padding:40px;color:#94a3b8;font-size:13px}
+
+/* ── タスク管理カード ── */
+.s-alert{--sc:var(--red);--sb:var(--red-b);--sl:var(--red-l)}
+.s-estimate{--sc:var(--gray);--sb:var(--gray-b);--sl:var(--gray-l)}
+.s-start{--sc:var(--blue);--sb:var(--blue-b);--sl:var(--blue-l)}
+.s-wip{--sc:var(--purple);--sb:var(--purple-b);--sl:var(--purple-l)}
+.s-review{--sc:var(--yellow);--sb:var(--yellow-b);--sl:var(--yellow-l)}
+.s-fix{--sc:var(--orange);--sb:var(--orange-b);--sl:var(--orange-l)}
+.s-deliver{--sc:var(--teal);--sb:var(--teal-b);--sl:var(--teal-l)}
+.s-invoice{--sc:var(--pink);--sb:var(--pink-b);--sl:var(--pink-l)}
+.s-done{--sc:var(--green);--sb:var(--green-b);--sl:var(--green-l)}
+.group-wrap{margin-bottom:24px}
+.group-hd{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.group-badge{font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--sl);color:var(--sc);border:1.5px solid var(--sb)}
+.group-count{font-size:11px;color:#94a3b8}
+.task-card{background:#fff;border-radius:9px;padding:14px 16px;margin-bottom:7px;border:1.5px solid #e5e7eb;transition:box-shadow .15s;border-left:3px solid var(--sc)}
+.task-card:hover{box-shadow:0 2px 10px rgba(0,0,0,.07)}
+.tc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;gap:8px}
+.tc-left{flex:1;min-width:0}
+.tc-project{font-size:11px;color:#94a3b8;margin-bottom:3px}
+.tc-name{font-size:14px;font-weight:600;color:#0f172a;line-height:1.4}
+.tc-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
+.tc-badge{font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px;border:1.5px solid var(--sb);background:var(--sl);color:var(--sc);cursor:pointer;white-space:nowrap;transition:opacity .15s}
+.tc-badge:hover{opacity:.75}
+.date-tag{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:500;white-space:nowrap}
+.dt-normal{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0}
+.dt-over{background:var(--red-l);color:var(--red);border:1px solid var(--red-b)}
+.dt-soon{background:var(--yellow-l);color:var(--yellow);border:1px solid var(--yellow-b)}
+.subtask-list{list-style:none;margin:8px 0}
+.subtask-item{display:grid;grid-template-columns:14px 1fr auto;gap:7px;align-items:start;padding:5px 0;border-bottom:1px solid #f8fafc;cursor:pointer}
+.subtask-item:last-child{border-bottom:none}
+.subtask-item:hover .sub-txt{color:#0f172a}
+.subtask-item.done .sub-txt{text-decoration:line-through;color:#cbd5e1}
+.sub-chk{width:14px;height:14px;border:1.5px solid #d1d5db;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;margin-top:1px;transition:all .15s;flex-shrink:0}
+.subtask-item.done .sub-chk{background:var(--green);border-color:var(--green);color:#fff}
+.sub-body{display:flex;flex-direction:column;gap:3px;min-width:0}
+.sub-txt{font-size:13px;color:#475569;line-height:1.4}
+.sub-assignee{font-size:10px;color:#64748b;background:#f1f5f9;padding:1px 6px;border-radius:999px;display:inline-block;width:fit-content}
+.sub-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.tc-prog{height:3px;background:#f1f5f9;border-radius:2px;overflow:hidden;margin-top:8px}
+.tc-prog-fill{height:100%;border-radius:2px;background:var(--sc);transition:width .4s}
+.tc-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.tc-meta{font-size:11px;color:#94a3b8}
+.tc-acts{display:flex;gap:4px}
+.act-btn{font-size:12px;padding:3px 9px;border:1.5px solid #e5e7eb;border-radius:5px;background:#fff;color:#94a3b8;cursor:pointer;font-family:inherit;font-weight:500;transition:all .15s}
+.act-btn:hover{color:#374151;border-color:#d1d5db}
+.act-edit:hover{color:var(--blue);border-color:var(--blue-b);background:var(--blue-l)}
+.act-del:hover{color:var(--red);border-color:var(--red-b);background:var(--red-l)}
+
+/* ── カンバン ── */
+.kanban{display:flex;gap:12px;overflow-x:auto;padding-bottom:16px;align-items:flex-start}
+.kanban::-webkit-scrollbar{height:5px}
+.kanban::-webkit-scrollbar-track{background:#f1f5f9;border-radius:3px}
+.kanban::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+.kb-col{width:210px;flex-shrink:0;background:#f8fafc;border-radius:10px;border:1.5px solid #e5e7eb;overflow:hidden}
+.kb-col-hd{padding:9px 12px;border-bottom:1.5px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;background:var(--sl)}
+.kb-col-title{font-size:12px;font-weight:600;color:var(--sc)}
+.kb-cnt{font-size:11px;font-weight:600;background:var(--sb);color:var(--sc);padding:1px 7px;border-radius:999px}
+.kb-cards{padding:8px;min-height:60px}
+.kb-card{background:#fff;border-radius:7px;padding:10px 11px;margin-bottom:6px;border:1.5px solid #e5e7eb;border-left:3px solid var(--sc);transition:box-shadow .15s}
+.kb-card:hover{box-shadow:0 2px 6px rgba(0,0,0,.06)}
+.kb-proj{font-size:10px;color:#94a3b8;margin-bottom:2px}
+.kb-name{font-size:12px;font-weight:600;color:#0f172a;line-height:1.4;margin-bottom:4px}
+.kb-members{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:3px}
+.kb-member{font-size:10px;color:#64748b;background:#f1f5f9;padding:1px 6px;border-radius:999px}
+.kb-dl{font-size:10px;margin-top:3px}
+
+/* ── カレンダー ── */
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.cal-title-txt{font-size:16px;font-weight:600;color:#0f172a}
+.cal-nav{border:1.5px solid #e5e7eb;border-radius:7px;padding:6px 14px;cursor:pointer;font-size:13px;font-weight:500;color:#374151;background:#fff;font-family:inherit;transition:all .15s}
+.cal-nav:hover{border-color:var(--teal);color:var(--teal);background:var(--teal-l)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#e5e7eb;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden}
+.cal-dow{background:#f8fafc;padding:7px 4px;text-align:center;font-size:11px;font-weight:600;color:#94a3b8;letter-spacing:.04em}
+.cal-day{background:#fff;min-height:90px;padding:5px}
+.cal-day.other{background:#fafafa;opacity:.55}
+.cal-day.today{background:#eff6ff}
+.cal-day.has-tasks{cursor:pointer}
+.cal-day.has-tasks:hover{background:#f5f3ff}
+.cal-num{font-size:12px;font-weight:500;color:#94a3b8;margin-bottom:3px}
+.cal-day.today .cal-num{color:var(--blue);font-weight:700}
+.cal-chip{font-size:10px;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4;font-weight:500;background:var(--sl,#f1f5f9);color:var(--sc,#64748b)}
+.chip-done{background:#f1f5f9!important;color:#94a3b8!important}
+.cal-more{font-size:10px;color:#94a3b8;padding:1px 3px}
+.cal-detail-item{padding:8px 0;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px;font-size:13px}
+.cal-detail-item:last-child{border-bottom:none}
+
+/* ── フォーム ── */
+.form-card{background:#fff;border-radius:10px;padding:22px;margin-bottom:14px;border:1.5px solid #e5e7eb}
+.form-card-title{font-size:14px;font-weight:600;margin-bottom:16px;color:#0f172a}
+.form-label{font-size:12px;font-weight:600;color:#374151;margin-bottom:5px;display:block}
+input[type=text],input[type=date],textarea,select{width:100%;padding:8px 11px;border:1.5px solid #e5e7eb;border-radius:7px;background:#fff;color:#0f172a;font-size:13px;font-family:inherit;margin-bottom:10px;transition:border-color .15s}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--blue)}
+textarea{resize:vertical;min-height:70px}
+.nippo-out{background:#f8fafc;border:1.5px solid #e5e7eb;border-radius:7px;padding:14px;white-space:pre-wrap;font-size:13px;line-height:1.8;color:#374151}
+.btn{padding:7px 16px;border:1.5px solid #e5e7eb;border-radius:7px;background:#fff;color:#374151;font-size:13px;cursor:pointer;font-family:inherit;font-weight:500;transition:all .15s}
+.btn:hover{border-color:#d1d5db;background:#f8fafc}
+.btn-blue{border-color:var(--blue-b);color:var(--blue);background:var(--blue-l)}
+.btn-blue:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn-green{border-color:var(--green-b);color:var(--green);background:var(--green-l)}
+.btn-green:hover{background:var(--green);color:#fff;border-color:var(--green)}
+.btn-orange{border-color:var(--orange-b);color:var(--orange);background:var(--orange-l)}
+.btn-orange:hover{background:var(--orange);color:#fff;border-color:var(--orange)}
+.btn-pink{border-color:var(--pink-b);color:var(--pink);background:var(--pink-l)}
+.btn-pink:hover{background:var(--pink);color:#fff;border-color:var(--pink)}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ── 管理設定カルーセル ── */
+.carousel-wrap{position:relative;margin-bottom:14px}
+.carousel-track-outer{overflow:hidden;border-radius:8px}
+.carousel-track{display:flex;transition:transform .3s ease}
+.carousel-page{min-width:100%;display:flex;flex-wrap:wrap;gap:6px;padding:4px}
+.master-tag{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:5px 12px;border-radius:7px;border:1.5px solid #e5e7eb;background:#fff;color:#374151;cursor:default}
+.del-tag{background:none;border:none;color:#d1d5db;cursor:pointer;font-size:14px;line-height:1;padding:0;margin-left:2px;transition:color .15s}
+.del-tag:hover{color:var(--red)}
+.carousel-controls{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px}
+.carousel-btn{background:#fff;border:1.5px solid #e5e7eb;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:13px;color:#64748b;transition:all .15s}
+.carousel-btn:hover{border-color:var(--blue);color:var(--blue)}
+.carousel-btn:disabled{opacity:.3;cursor:not-allowed}
+.carousel-dots{display:flex;gap:5px}
+.c-dot{width:6px;height:6px;border-radius:50%;background:#e5e7eb;transition:background .2s}
+.c-dot.active{background:var(--blue)}
+
+/* ── ツールバー ── */
+.toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.sort-row{display:flex;align-items:center;gap:6px}
+.sort-lbl{font-size:12px;color:#94a3b8;font-weight:500}
+.sort-btn{font-size:12px;padding:5px 11px;border:1.5px solid #e5e7eb;border-radius:6px;background:#fff;color:#64748b;cursor:pointer;font-family:inherit;font-weight:500;transition:all .15s}
+.sort-btn:hover{border-color:var(--blue);color:var(--blue)}
+.sort-btn.active{background:var(--blue-l);color:var(--blue);border-color:var(--blue-b)}
+.fsel{font-size:12px;padding:5px 10px;border:1.5px solid #e5e7eb;border-radius:6px;background:#fff;color:#64748b;font-family:inherit;font-weight:500;cursor:pointer}
+.fsel:focus{outline:none;border-color:var(--blue)}
+
+/* ── モーダル ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.3);z-index:100;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:#fff;border-radius:12px;padding:24px;width:90%;max-width:560px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.modal-title{font-size:16px;font-weight:600;margin-bottom:20px;color:#0f172a}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.sub-edit-row{background:#f8fafc;border:1.5px solid #e5e7eb;border-radius:8px;padding:10px;margin-bottom:8px}
+.sub-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
+.sub-edit-grid input,.sub-edit-grid select{margin-bottom:0}
+.sub-edit-bottom{display:flex;align-items:center;gap:6px}
+.sub-edit-bottom input[type=date]{margin-bottom:0;flex:1}
+.rm-btn{background:none;border:1.5px solid var(--red-b);color:var(--red);cursor:pointer;font-size:12px;padding:3px 8px;border-radius:5px;font-family:inherit;font-weight:500;white-space:nowrap}
+.rm-btn:hover{background:var(--red-l)}
+.info-box{background:#f8fafc;border:1.5px solid #e5e7eb;border-radius:7px;padding:12px;font-size:12px;color:#64748b;line-height:1.8}
+.loading{text-align:center;padding:48px;color:#94a3b8;font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+.stat{background:#fff;border-radius:9px;padding:14px 16px;border:1.5px solid #e5e7eb;position:relative;overflow:hidden}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.stat-a::before{background:var(--blue)}.stat-b::before{background:var(--purple)}.stat-c::before{background:var(--green)}.stat-d::before{background:var(--red)}
+.stat-num{font-size:26px;font-weight:600;line-height:1}
+.stat-lbl{font-size:11px;color:#94a3b8;margin-top:4px;font-weight:500}
+
+/* ── モバイル ── */
+.mobile-header{display:none;background:#fff;border-bottom:1px solid #e5e7eb;padding:12px 16px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:15}
+.mobile-menu-btn{border:1.5px solid #e5e7eb;border-radius:6px;background:#fff;color:#374151;font-size:13px;font-weight:500;cursor:pointer;padding:5px 12px;font-family:inherit}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:19}
+@media(max-width:720px){
+  .sidebar{transform:translateX(-100%);transition:transform .25s}
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-overlay.open{display:block}
+  .main{margin-left:0}
+  .mobile-header{display:flex}
+  .main-pane{padding:14px}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .cal-day{min-height:50px}
+  .cal-chip{display:none}
+  .kanban{gap:8px}.kb-col{width:175px}
+}
+</style>
+</head>
+<body>
+
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-title">案件進捗</div>
+    <div class="logo-sub">プロジェクト管理</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-sec">案件</div>
+    <button class="nav-btn nb-projects active" onclick="switchTab('projects',this)"><span class="nav-dot"></span>案件一覧</button>
+    <button class="nav-btn nb-progress" onclick="switchTab('progress',this)"><span class="nav-dot"></span>進捗管理</button>
+    <div class="nav-sec">タスク</div>
+    <button class="nav-btn nb-task" onclick="switchTab('task',this)"><span class="nav-dot"></span>タスク管理</button>
+    <button class="nav-btn nb-board" onclick="switchTab('board',this)"><span class="nav-dot"></span>ステータスボード</button>
+    <button class="nav-btn nb-cal" onclick="switchTab('calendar',this)"><span class="nav-dot"></span>カレンダー</button>
+    <div class="nav-sec">その他</div>
+    <button class="nav-btn nb-nippo" onclick="switchTab('nippo',this)"><span class="nav-dot"></span>日報作成</button>
+    <button class="nav-btn nb-manage" onclick="switchTab('manage',this)"><span class="nav-dot"></span>管理設定</button>
+  </nav>
+  <div class="sidebar-footer">
+    <span class="sync-pill sync-ing" id="sync-status">接続中</span>
+    <span class="save-flash" id="save-flash">保存しました</span>
+    <span class="last-sync-txt" id="last-sync"></span>
+  </div>
+</div>
+
+<div class="mobile-header">
+  <button class="mobile-menu-btn" onclick="toggleMobileMenu()">メニュー</button>
+  <span style="font-size:14px;font-weight:600;color:#0f172a">案件進捗</span>
+  <span class="sync-pill sync-ing" id="sync-status-m" style="font-size:10px;padding:2px 8px">接続中</span>
+</div>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeMobileMenu()"></div>
+
+<div class="main">
+
+<!-- ① 案件一覧 -->
+<div id="pane-projects" class="main-pane active">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <div class="pane-title" style="margin-bottom:0">案件一覧</div>
+    <button class="add-proj-btn" onclick="openAddProject()">+ 案件を追加</button>
+  </div>
+  <div id="proj-alert-area"></div>
+  <div class="filter-bar">
+    <div class="filter-tabs">
+      <button class="filter-tab active" onclick="setProjFilter('all',this)">すべて</button>
+      <button class="filter-tab" onclick="setProjFilter('shot',this)">ショット</button>
+      <button class="filter-tab" onclick="setProjFilter('internal',this)">社内</button>
+      <button class="filter-tab" onclick="setProjFilter('running',this)">ランニング</button>
+      <button class="filter-tab" onclick="setProjFilter('done',this)">完了</button>
+    </div>
+    <input class="filter-search" type="text" id="proj-search" placeholder="案件名・クライアント名で検索..." oninput="renderProjects()"/>
+  </div>
+  <div class="proj-table-wrap">
+    <table class="proj-table">
+      <thead>
+        <tr>
+          <th>案件名 / クライアント</th>
+          <th>種別</th>
+          <th>制作開始日</th>
+          <th>納品予定日</th>
+          <th>残日数</th>
+          <th>工程担当</th>
+          <th>制作メンバー</th>
+          <th>進捗状況</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="proj-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ② 進捗管理 -->
+<div id="pane-progress" class="main-pane">
+  <div class="pane-title">進捗管理</div>
+  <select class="progress-sel" id="progress-proj-sel" onchange="renderProgressDetail()">
+    <option value="">-- 案件を選択してください --</option>
+  </select>
+  <div id="progress-detail"></div>
+</div>
+
+<!-- タスク管理 -->
+<div id="pane-task" class="main-pane">
+  <div class="pane-title">タスク管理</div>
+  <div class="stats">
+    <div class="stat stat-a"><div class="stat-num" id="s-total" style="color:var(--blue)">0</div><div class="stat-lbl">タスク総数</div></div>
+    <div class="stat stat-b"><div class="stat-num" id="s-inprog" style="color:var(--purple)">0</div><div class="stat-lbl">進行中</div></div>
+    <div class="stat stat-c"><div class="stat-num" id="s-done" style="color:var(--green)">0</div><div class="stat-lbl">完了</div></div>
+    <div class="stat stat-d"><div class="stat-num" id="s-over" style="color:var(--red)">0</div><div class="stat-lbl">期限切れ</div></div>
+  </div>
+  <div class="toolbar">
+    <div class="sort-row">
+      <span class="sort-lbl">並び順</span>
+      <button class="sort-btn active" onclick="setSort('status',this)">ステータス</button>
+      <button class="sort-btn" onclick="setSort('name',this)">案件名</button>
+      <button class="sort-btn" onclick="setSort('deadline',this)">締切</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span class="sort-lbl">担当者</span>
+      <select class="fsel" id="filter-assignee" onchange="renderTasks()"><option value="">全員</option></select>
+    </div>
+  </div>
+  <div id="task-list"><div class="loading">読み込み中...</div></div>
+</div>
+
+<!-- ステータスボード -->
+<div id="pane-board" class="main-pane">
+  <div class="pane-title">ステータスボード</div>
+  <div class="kanban" id="kanban-board"></div>
+</div>
+
+<!-- カレンダー -->
+<div id="pane-calendar" class="main-pane">
+  <div class="pane-title">カレンダー</div>
+  <div class="cal-header">
+    <button class="cal-nav" onclick="calMove(-1)">前月</button>
+    <div class="cal-title-txt" id="cal-title"></div>
+    <button class="cal-nav" onclick="calMove(1)">次月</button>
+  </div>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div style="margin-top:10px;font-size:12px;color:#94a3b8">締切日のあるタスクが表示されます</div>
+</div>
+
+<!-- 日報 -->
+<div id="pane-nippo" class="main-pane">
+  <div class="pane-title">日報作成</div>
+  <div class="form-card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <span class="form-label" style="margin-bottom:0;white-space:nowrap">対象日</span>
+      <input type="date" id="nippo-date" style="width:auto;margin-bottom:0"/>
+    </div>
+    <label class="form-label">今日やったこと</label>
+    <textarea id="today-input" placeholder="例：山田プレスLP 修正完了&#10;丸眞 キックオフ調整完了"></textarea>
+    <label class="form-label">明日やること</label>
+    <textarea id="tomorrow-input" placeholder="例：野田商店 Q&A確認&#10;GY 投稿画像制作"></textarea>
+    <label class="form-label">特記事項（任意）</label>
+    <textarea id="memo-input" style="min-height:50px" placeholder="例：◯◯さん先方返信待ち"></textarea>
+    <div class="btn-row">
+      <button class="btn btn-green" onclick="generateNippo()">日報を生成</button>
+      <button class="btn" id="copy-btn" onclick="copyNippo()">コピー</button>
+    </div>
+  </div>
+  <div id="nippo-out-wrap" style="display:none">
+    <div class="form-label" style="margin-bottom:8px">生成された日報</div>
+    <div class="nippo-out" id="nippo-output"></div>
+  </div>
+</div>
+
+<!-- 管理設定 -->
+<div id="pane-manage" class="main-pane">
+  <div class="pane-title">管理設定</div>
+
+  <!-- クライアント名マスター（カルーセル） -->
+  <div class="form-card">
+    <div class="form-card-title">クライアント名マスター</div>
+    <div class="carousel-wrap" id="client-carousel-wrap">
+      <div class="carousel-track-outer">
+        <div class="carousel-track" id="client-carousel-track"></div>
+      </div>
+      <div class="carousel-controls" id="client-carousel-controls" style="display:none">
+        <button class="carousel-btn" id="client-prev" onclick="carouselMove('client',-1)">←</button>
+        <div class="carousel-dots" id="client-dots"></div>
+        <button class="carousel-btn" id="client-next" onclick="carouselMove('client',1)">→</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input type="text" id="new-client-name" placeholder="クライアント名を入力（例：山田プレス）" style="margin-bottom:0;flex:1"/>
+      <button class="btn btn-blue" onclick="addClientMaster()" style="white-space:nowrap">追加</button>
+    </div>
+  </div>
+
+  <!-- 担当者マスター -->
+  <div class="form-card">
+    <div class="form-card-title">担当者マスター</div>
+    <div class="carousel-wrap" id="assignee-carousel-wrap">
+      <div class="carousel-track-outer">
+        <div class="carousel-track" id="assignee-carousel-track"></div>
+      </div>
+      <div class="carousel-controls" id="assignee-carousel-controls" style="display:none">
+        <button class="carousel-btn" id="assignee-prev" onclick="carouselMove('assignee',-1)">←</button>
+        <div class="carousel-dots" id="assignee-dots"></div>
+        <button class="carousel-btn" id="assignee-next" onclick="carouselMove('assignee',1)">→</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input type="text" id="new-assignee-name" placeholder="担当者名を入力（例：和泉、市岡）" style="margin-bottom:0;flex:1"/>
+      <button class="btn btn-blue" onclick="addAssigneeMaster()" style="white-space:nowrap">追加</button>
+    </div>
+  </div>
+
+  <!-- 新規タスク追加 -->
+  <div class="form-card">
+    <div class="form-card-title">新規タスクを追加</div>
+    <label class="form-label">案件名</label>
+    <select id="new-task-project"><option value="">-- 案件を選択 --</option></select>
+    <label class="form-label">タスク名</label>
+    <input type="text" id="new-task-name" placeholder="例：トップページデザイン作成"/>
+    <label class="form-label">ステータス</label>
+    <select id="new-task-status">
+      <option value="alert">要対応</option>
+      <option value="estimate">見積もり作成</option>
+      <option value="start">着手</option>
+      <option value="wip" selected>対応中</option>
+      <option value="review">確認中</option>
+      <option value="fix">修正対応中</option>
+      <option value="deliver">納品</option>
+      <option value="invoice">請求書</option>
+      <option value="done">完了</option>
+    </select>
+    <label class="form-label">締切日（任意）</label>
+    <input type="date" id="new-task-deadline"/>
+    <label class="form-label" style="margin-bottom:8px">サブタスク（任意）</label>
+    <textarea id="new-task-subs" placeholder="ヒアリング&#10;デザイン初稿提出&#10;修正対応"></textarea>
+    <div class="btn-row"><button class="btn btn-orange" onclick="addTask()">追加する</button></div>
+  </div>
+
+  <div class="form-card">
+    <div class="form-card-title">データについて</div>
+    <div class="info-box">データはFirebaseクラウドに自動保存されます。<br>接続先：tasuku-3e8ac (Firestore)</div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- 案件追加・編集モーダル -->
+<div class="overlay" id="proj-modal" onclick="if(event.target===this)closeModal('proj-modal')">
+  <div class="modal">
+    <div class="modal-title" id="proj-modal-title">案件を追加</div>
+    <input type="hidden" id="proj-edit-id"/>
+    <label class="form-label">クライアント名</label>
+    <select id="proj-client"></select>
+    <label class="form-label">案件名</label>
+    <input type="text" id="proj-name" placeholder="例：コーポレートサイトリニューアル"/>
+    <label class="form-label">種別</label>
+    <select id="proj-type">
+      <option value="shot">ショット案件</option>
+      <option value="internal">社内案件</option>
+      <option value="running">ランニング案件</option>
+      <option value="done">完了案件</option>
+    </select>
+    <label class="form-label">制作開始日</label>
+    <input type="date" id="proj-start"/>
+    <label class="form-label">納品予定日</label>
+    <input type="date" id="proj-end"/>
+    <label class="form-label">工程管理担当者</label>
+    <select id="proj-pm"></select>
+    <label class="form-label">制作メンバー（複数選択可）</label>
+    <div id="proj-members-chk" style="display:flex;flex-wrap:wrap;gap:8px;padding:8px;background:#f8fafc;border-radius:7px;border:1.5px solid #e5e7eb;margin-bottom:10px;min-height:40px"></div>
+    <label class="form-label">進捗状況</label>
+    <select id="proj-prog-status">
+      <option value="0">受注/着手前</option>
+      <option value="20">〜20%</option>
+      <option value="40">〜40%</option>
+      <option value="60">〜60%</option>
+      <option value="80">〜80%</option>
+      <option value="100">〜100%</option>
+      <option value="complete">完了</option>
+      <option value="maintenance">保守対応</option>
+    </select>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('proj-modal')">キャンセル</button>
+      <button class="btn btn-pink" onclick="saveProject()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- タスク編集モーダル -->
+<div class="overlay" id="edit-modal" onclick="if(event.target===this)closeModal('edit-modal')">
+  <div class="modal">
+    <div class="modal-title">タスクを編集</div>
+    <input type="hidden" id="edit-id"/>
+    <label class="form-label">案件名</label>
+    <select id="edit-project"></select>
+    <label class="form-label">タスク名</label>
+    <input type="text" id="edit-name"/>
+    <label class="form-label">ステータス</label>
+    <select id="edit-status">
+      <option value="alert">要対応</option>
+      <option value="estimate">見積もり作成</option>
+      <option value="start">着手</option>
+      <option value="wip">対応中</option>
+      <option value="review">確認中</option>
+      <option value="fix">修正対応中</option>
+      <option value="deliver">納品</option>
+      <option value="invoice">請求書</option>
+      <option value="done">完了</option>
+    </select>
+    <label class="form-label">締切日</label>
+    <input type="date" id="edit-deadline"/>
+    <label class="form-label" style="margin-bottom:8px">サブタスク（担当者・締切日をサブタスクごとに設定）</label>
+    <div id="edit-subs-list"></div>
+    <button class="btn" onclick="addEditSub()" style="margin-top:6px;font-size:12px">+ サブタスクを追加</button>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('edit-modal')">キャンセル</button>
+      <button class="btn btn-blue" onclick="saveEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- カレンダー詳細モーダル -->
+<div class="overlay" id="cal-modal" onclick="if(event.target===this)closeModal('cal-modal')">
+  <div class="modal">
+    <div class="modal-title" id="cal-modal-title"></div>
+    <div id="cal-modal-body"></div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('cal-modal')">閉じる</button></div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBpn6WRCh0UDmF5KkhcQihEJMQLniPQ3jc",
+  authDomain: "tasuku-3e8ac.firebaseapp.com",
+  projectId: "tasuku-3e8ac",
+  storageBucket: "tasuku-3e8ac.firebasestorage.app",
+  messagingSenderId: "551813900502",
+  appId: "1:551813900502:web:753645be12622952108177",
+  measurementId: "G-H6RSQR3TYB"
+};
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+// ─── ステータス定義 ───
+const STATUSES = [
+  {id:'alert',   label:'要対応',      cls:'s-alert'},
+  {id:'estimate',label:'見積もり作成',cls:'s-estimate'},
+  {id:'start',   label:'着手',        cls:'s-start'},
+  {id:'wip',     label:'対応中',      cls:'s-wip'},
+  {id:'review',  label:'確認中',      cls:'s-review'},
+  {id:'fix',     label:'修正対応中',  cls:'s-fix'},
+  {id:'deliver', label:'納品',        cls:'s-deliver'},
+  {id:'invoice', label:'請求書',      cls:'s-invoice'},
+  {id:'done',    label:'完了',        cls:'s-done'},
+];
+const ST     = Object.fromEntries(STATUSES.map(s=>[s.id,s]));
+const ST_ORD = Object.fromEntries(STATUSES.map((s,i)=>[s.id,i]));
+
+// ─── 状態 ───
+let tasks=[], projects=[], assignees=[], projItems=[], kpiData={};
+let currentSort='status', projFilter='all';
+let calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
+const carouselIdx={client:0, assignee:0};
+const ITEMS_PER_PAGE = 18;
+
+// ─── Sync UI ───
+function setSS(s){
+  ['sync-status','sync-status-m'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    el.className='sync-pill';
+    if(s==='ok'){el.classList.add('sync-ok');el.textContent='同期済';}
+    if(s==='err'){el.classList.add('sync-err');el.textContent='エラー';}
+    if(s==='ing'){el.classList.add('sync-ing');el.textContent='同期中';}
+  });
+}
+function flash(){const el=document.getElementById('save-flash');el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),1800);}
+
+// ─── Meta（クライアント・担当者マスター） ───
+async function loadMeta(){
+  try{
+    const snap=await getDoc(doc(db,'meta','config'));
+    if(snap.exists()){const d=snap.data();projects=d.projects||[];assignees=d.assignees||[];}
+  }catch(e){}
+  renderMeta();
+}
+async function saveMeta(){try{await setDoc(doc(db,'meta','config'),{projects,assignees});}catch(e){}}
+
+// ─── 案件データ（projItems） ───
+onSnapshot(collection(db,'proj_items'),snap=>{
+  projItems=[];snap.forEach(d=>projItems.push(d.data()));
+  projItems.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  renderProjects();
+  renderProgressSel();
+  renderAlerts();
+  setSS('ok');
+  document.getElementById('last-sync').textContent=new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+' 更新';
+},()=>setSS('err'));
+
+// ─── KPIデータ ───
+onSnapshot(collection(db,'kpi_data'),snap=>{
+  kpiData={};
+  snap.forEach(d=>{const dt=d.data();kpiData[dt.projId]=dt;});
+  renderProgressDetail();
+  // KPI完了率から案件一覧の進捗を自動更新
+  syncKpiToProj();
+  renderProjects();
+  renderAlerts();
+},()=>{});
+
+async function saveProjItem(p){setSS('ing');try{await setDoc(doc(db,'proj_items',p.id),p);flash();}catch{setSS('err');}}
+async function delProjItem(id){setSS('ing');try{await deleteDoc(doc(db,'proj_items',id));}catch{setSS('err');}}
+async function saveKpi(projId,data){setSS('ing');try{await setDoc(doc(db,'kpi_data',projId),{projId,...data});flash();}catch{setSS('err');}}
+
+// ─── tasks_v2 ───
+onSnapshot(collection(db,'tasks_v2'),snap=>{
+  const data=[];snap.forEach(d=>data.push(d.data()));
+  data.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  tasks=data;
+  renderTasks();renderBoard();renderCal();updateStats();
+},()=>{});
+async function saveTask(t){setSS('ing');try{await setDoc(doc(db,'tasks_v2',t.id),t);flash();}catch{setSS('err');}}
+async function delTask(id){setSS('ing');try{await deleteDoc(doc(db,'tasks_v2',id));}catch{setSS('err');}}
+
+// ─── KPI→案件進捗 自動同期（双方向連携） ───
+function syncKpiToProj(){
+  projItems.forEach(p=>{
+    if(!p.autoProgress)return;
+    const pct=calcKpiPct(p.id);
+    if(pct===null)return;
+    const newStatus=pctToProgStatus(pct);
+    if(p.progStatus!==newStatus){
+      p.progStatus=newStatus;
+      setDoc(doc(db,'proj_items',p.id),p).catch(()=>{});
+    }
+  });
+}
+
+// ─── ユーティリティ ───
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtD(d){if(!d)return '';try{const dt=new Date(d+'T00:00:00');return `${dt.getMonth()+1}/${dt.getDate()}`;}catch{return d;}}
+function fmtDFull(d){if(!d)return '−';try{const dt=new Date(d+'T00:00:00');return `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}`;}catch{return d;}}
+function isOver(d){if(!d)return false;try{return new Date(d+'T23:59:59')<new Date();}catch{return false;}}
+function isSoon(d){if(!d)return false;try{const diff=(new Date(d+'T23:59:59')-new Date())/864e5;return diff>=0&&diff<=3;}catch{return false;}}
+function dtCls(d){return isOver(d)?'dt-over':isSoon(d)?'dt-soon':'dt-normal';}
+function calcProg(t){const s=t.subtasks||[];return s.length?Math.round(s.filter(x=>x.done).length/s.length*100):0;}
+function sCls(id){return ST[id]?.cls||'s-wip';}
+function sLbl(id){return ST[id]?.label||id;}
+
+// 平日残日数計算
+function workdaysLeft(endDate){
+  if(!endDate)return null;
+  const end=new Date(endDate+'T23:59:59');
+  const now=new Date();
+  if(end<now)return -1;
+  let count=0,cur=new Date(now);
+  cur.setHours(0,0,0,0);
+  while(cur<=end){const d=cur.getDay();if(d!==0&&d!==6)count++;cur.setDate(cur.getDate()+1);}
+  return count;
+}
+
+// 進捗ラベル・バー
+const PROG_LABELS={'0':'受注/着手前','20':'〜20%','40':'〜40%','60':'〜60%','80':'〜80%','100':'〜100%','complete':'完了','maintenance':'保守対応'};
+const PROG_PCT={'0':0,'20':20,'40':40,'60':60,'80':80,'100':100,'complete':100,'maintenance':100};
+function progColor(pct){if(pct>=80)return 'var(--green)';if(pct>=40)return 'var(--blue)';if(pct>0)return 'var(--yellow)';return '#e5e7eb';}
+const TYPE_LABELS={shot:'ショット',internal:'社内',running:'ランニング',done:'完了'};
+
+// ─── ① 案件一覧 ───
+window.setProjFilter=(f,el)=>{
+  projFilter=f;
+  document.querySelectorAll('.filter-tab').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  renderProjects();
+};
+
+function renderProjects(){
+  const tbody=document.getElementById('proj-tbody');if(!tbody)return;
+  const q=(document.getElementById('proj-search')?.value||'').toLowerCase();
+  let list=[...projItems];
+  if(projFilter!=='all')list=list.filter(p=>p.type===projFilter);
+  if(q)list=list.filter(p=>(p.name||'').toLowerCase().includes(q)||(p.client||'').toLowerCase().includes(q));
+  if(!list.length){tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:32px;color:#94a3b8;font-size:13px">案件がありません</td></tr>`;return;}
+  tbody.innerHTML=list.map(p=>{
+    const days=workdaysLeft(p.endDate);
+    let dayChip='<span class="days-chip days-none">−</span>';
+    if(days===null)dayChip='<span class="days-chip days-none">未設定</span>';
+    else if(days<0)dayChip='<span class="days-chip days-danger">期限切れ</span>';
+    else if(days<=5)dayChip=`<span class="days-chip days-danger">${days}日</span>`;
+    else if(days<=10)dayChip=`<span class="days-chip days-warn">${days}日</span>`;
+    else dayChip=`<span class="days-chip days-ok">${days}日</span>`;
+    const pct=PROG_PCT[p.progStatus||'0']||0;
+    const members=(p.members||[]).map(m=>`<span class="member-chip">${esc(m)}</span>`).join('');
+    const typeBadge=`<span class="type-badge type-${p.type||'shot'}">${TYPE_LABELS[p.type||'shot']}</span>`;
+    const progOpts=['0','20','40','60','80','100','complete','maintenance'].map(v=>`<option value="${v}"${(p.progStatus||'0')===v?' selected':''}>${PROG_LABELS[v]}</option>`).join('');
+    return `<tr>
+      <td><div class="proj-name-cell">${esc(p.name||'')}</div><div class="proj-client">${esc(p.client||'')}</div></td>
+      <td>${typeBadge}</td>
+      <td style="white-space:nowrap;color:#64748b;font-size:12px">${fmtDFull(p.startDate)}</td>
+      <td style="white-space:nowrap;color:#64748b;font-size:12px">${fmtDFull(p.endDate)}</td>
+      <td>${dayChip}</td>
+      <td style="font-size:12px;color:#374151">${esc(p.pm||'−')}</td>
+      <td><div class="member-chips">${members||'<span style="font-size:12px;color:#94a3b8">−</span>'}</div></td>
+      <td>
+        <select class="proj-status-sel" onchange="updateProjStatus('${p.id}',this.value)">${progOpts}</select>
+        <div class="progress-bar-sm" style="margin-top:4px"><div class="progress-fill-sm" style="width:${pct}%;background:${progColor(pct)}"></div></div>
+      </td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="tbl-act" onclick="goToProgress('${p.id}')" style="color:var(--teal);border-color:var(--teal-b);background:var(--teal-l)">進捗</button>
+          <button class="tbl-act" onclick="openEditProject('${p.id}')" style="color:var(--blue);border-color:var(--blue-b);background:var(--blue-l)">編集</button>
+          <button class="tbl-act" onclick="deleteProjItem('${p.id}')">削除</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+window.updateProjStatus=(id,val)=>{
+  const p=projItems.find(x=>x.id===id);if(!p)return;
+  p.progStatus=val;p.autoProgress=false;
+  saveProjItem(p);
+};
+
+// ─── アラート（強化版）───
+function calcKpiPct(projId){
+  const kpi=kpiData[projId];
+  if(!kpi||!kpi.items||!kpi.items.length)return null;
+  const totalW=kpi.items.reduce((s,k)=>s+(k.weight||1),0);
+  const doneW=kpi.items.filter(k=>k.done).reduce((s,k)=>s+(k.weight||1),0);
+  return totalW>0?Math.round(doneW/totalW*100):0;
+}
+function pctToProgStatus(pct){
+  if(pct>=100)return'complete';
+  if(pct>=80)return'100';
+  if(pct>=60)return'80';
+  if(pct>=40)return'60';
+  if(pct>=20)return'40';
+  if(pct>0)return'20';
+  return'0';
+}
+function workdaysBetween(start,end){
+  if(!start||!end)return 0;
+  try{
+    let count=0,cur=new Date(start+'T00:00:00');
+    const endDt=new Date(end+'T23:59:59');
+    while(cur<=endDt){const d=cur.getDay();if(d!==0&&d!==6)count++;cur.setDate(cur.getDate()+1);}
+    return count;
+  }catch{return 0;}
+}
+function renderAlerts(){
+  const area=document.getElementById('proj-alert-area');if(!area)return;
+  const critical=[],warnings=[];
+  projItems.forEach(p=>{
+    if(p.type==='done'||p.progStatus==='complete'||p.progStatus==='maintenance')return;
+    const pct=PROG_PCT[p.progStatus||'0']||0;
+    const kpiPct=calcKpiPct(p.id);
+    const effectivePct=kpiPct!==null?kpiPct:pct;
+    const days=workdaysLeft(p.endDate);
+    const name=p.name||(p.client?p.client+'の案件':'不明');
+    if(days===-1){
+      critical.push(`「${name}」納品期限を過ぎています（進捗${effectivePct}%）`);
+      return;
+    }
+    if(days!==null&&p.startDate&&p.endDate){
+      const totalDays=workdaysBetween(p.startDate,p.endDate);
+      const elapsed=totalDays-days;
+      const expectedPct=totalDays>0?Math.round(elapsed/totalDays*100):0;
+      const gap=expectedPct-effectivePct;
+      if(gap>=40) critical.push(`「${name}」進捗が大幅遅延（予定${expectedPct}% → 実績${effectivePct}%、残${days}日）`);
+      else if(gap>=20) warnings.push(`「${name}」進捗がやや遅れています（予定${expectedPct}% → 実績${effectivePct}%、残${days}日）`);
+      else if(days<=5&&effectivePct<80) critical.push(`「${name}」残${days}日で進捗${effectivePct}%`);
+      else if(days<=10&&effectivePct<50) warnings.push(`「${name}」残${days}日で進捗${effectivePct}%`);
+    }else if(days!==null){
+      if(days<=5&&effectivePct<80) critical.push(`「${name}」残${days}日で進捗${effectivePct}%`);
+      else if(days<=10&&effectivePct<50) warnings.push(`「${name}」残${days}日で進捗${effectivePct}%`);
+    }
+  });
+  const all=[...critical,...warnings];
+  if(!all.length){area.innerHTML='';return;}
+  const critHTML=critical.map(a=>`<div class="alert-item"><span class="alert-dot"></span>${esc(a)}</div>`).join('');
+  const warnHTML=warnings.map(a=>`<div class="alert-item" style="color:var(--yellow)"><span class="alert-dot" style="background:var(--yellow)"></span>${esc(a)}</div>`).join('');
+  area.innerHTML=`<div class="alert-banner">
+    <div class="alert-banner-title">要注意案件 ${critical.length?`<span style="background:var(--red);color:#fff;font-size:10px;padding:1px 7px;border-radius:999px;margin-left:4px">緊急 ${critical.length}件</span>`:''}${warnings.length?`<span style="background:var(--yellow-l);color:var(--yellow);border:1px solid var(--yellow-b);font-size:10px;padding:1px 7px;border-radius:999px;margin-left:4px">注意 ${warnings.length}件</span>`:''}</div>
+    ${critHTML}${warnHTML}
+  </div>`;
+}
+
+// ─── 案件モーダル ───
+function buildProjModal(){
+  const pSel=document.getElementById('proj-client');
+  pSel.innerHTML='<option value="">-- クライアントを選択 --</option>'+projects.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  const pmSel=document.getElementById('proj-pm');
+  pmSel.innerHTML='<option value="">-- 担当者を選択 --</option>'+assignees.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  const mChk=document.getElementById('proj-members-chk');
+  mChk.innerHTML=assignees.map(a=>`<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" value="${esc(a)}" style="width:auto;margin-bottom:0"/> ${esc(a)}</label>`).join('');
+}
+window.openAddProject=()=>{
+  document.getElementById('proj-modal-title').textContent='案件を追加';
+  document.getElementById('proj-edit-id').value='';
+  buildProjModal();
+  document.getElementById('proj-name').value='';
+  document.getElementById('proj-start').value='';
+  document.getElementById('proj-end').value='';
+  document.getElementById('proj-prog-status').value='0';
+  document.getElementById('proj-type').value='shot';
+  document.getElementById('proj-modal').classList.add('open');
+};
+window.openEditProject=(id)=>{
+  const p=projItems.find(x=>x.id===id);if(!p)return;
+  document.getElementById('proj-modal-title').textContent='案件を編集';
+  document.getElementById('proj-edit-id').value=id;
+  buildProjModal();
+  document.getElementById('proj-client').value=p.client||'';
+  document.getElementById('proj-name').value=p.name||'';
+  document.getElementById('proj-type').value=p.type||'shot';
+  document.getElementById('proj-start').value=p.startDate||'';
+  document.getElementById('proj-end').value=p.endDate||'';
+  document.getElementById('proj-pm').value=p.pm||'';
+  document.getElementById('proj-prog-status').value=p.progStatus||'0';
+  // メンバーチェック
+  const chks=document.querySelectorAll('#proj-members-chk input');
+  chks.forEach(c=>c.checked=(p.members||[]).includes(c.value));
+  document.getElementById('proj-modal').classList.add('open');
+};
+window.saveProject=()=>{
+  const eid=document.getElementById('proj-edit-id').value;
+  const id=eid||uid();
+  const members=Array.from(document.querySelectorAll('#proj-members-chk input:checked')).map(c=>c.value);
+  const p={
+    id,
+    client:document.getElementById('proj-client').value,
+    name:document.getElementById('proj-name').value.trim(),
+    type:document.getElementById('proj-type').value,
+    startDate:document.getElementById('proj-start').value,
+    endDate:document.getElementById('proj-end').value,
+    pm:document.getElementById('proj-pm').value,
+    members,
+    progStatus:document.getElementById('proj-prog-status').value,
+    autoProgress:false,
+    createdAt:eid?(projItems.find(x=>x.id===eid)?.createdAt||Date.now()):Date.now(),
+  };
+  if(!p.name){alert('案件名を入力してください');return;}
+  saveProjItem(p);
+  closeModal('proj-modal');
+};
+window.deleteProjItem=(id)=>{
+  const p=projItems.find(x=>x.id===id);
+  if(!p||!confirm(`「${p.name}」を削除しますか？`))return;
+  delProjItem(id);
+};
+window.goToProgress=(id)=>{
+  // 進捗管理タブに移動して該当案件を選択
+  switchTab('progress',document.querySelector('.nb-progress'));
+  setTimeout(()=>{
+    const sel=document.getElementById('progress-proj-sel');
+    if(sel){sel.value=id;renderProgressDetail();}
+  },100);
+};
+
+// ─── ② 進捗管理 ───
+function renderProgressSel(){
+  const sel=document.getElementById('progress-proj-sel');if(!sel)return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">-- 案件を選択してください --</option>'+projItems.map(p=>`<option value="${p.id}"${p.id===cur?' selected':''}>${esc(p.client?p.client+'｜':'')}${esc(p.name)}</option>`).join('');
+}
+window.renderProgressDetail=()=>{
+  const sel=document.getElementById('progress-proj-sel');
+  const id=sel?.value;
+  const area=document.getElementById('progress-detail');if(!area)return;
+  if(!id){area.innerHTML='<div class="no-proj-msg">案件を選択すると進捗KPIを管理できます</div>';return;}
+  const p=projItems.find(x=>x.id===id);if(!p){area.innerHTML='';return;}
+  const kpi=kpiData[id]||{projId:id,items:[]};
+  const items=kpi.items||[];
+  const totalW=items.reduce((s,k)=>s+(k.weight||1),0);
+  const doneW=items.filter(k=>k.done).reduce((s,k)=>s+(k.weight||1),0);
+  const pct=totalW>0?Math.round(doneW/totalW*100):0;
+  const kpiHTML=items.map(k=>`
+    <li class="kpi-item${k.done?' done':''}" onclick="toggleKpi('${id}','${k.id}')">
+      <span class="kpi-chk">${k.done?'✓':''}</span>
+      <span class="kpi-txt">${esc(k.text)}</span>
+      <span class="kpi-weight">比重:${k.weight||1}</span>
+      <button onclick="event.stopPropagation();delKpi('${id}','${k.id}')" style="background:none;border:none;color:#d1d5db;cursor:pointer;font-size:13px;padding:0 4px;transition:color .15s" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='#d1d5db'">x</button>
+    </li>`).join('');
+  const days=workdaysLeft(p.endDate);
+  let daysHTML='';
+  if(days===null)daysHTML='';
+  else if(days<0)daysHTML='<span class="days-chip days-danger" style="font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--red-b);background:var(--red-l);color:var(--red)">期限切れ</span>';
+  else if(days<=5)daysHTML=`<span class="days-chip days-danger" style="font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--red-b);background:var(--red-l);color:var(--red)">残${days}日</span>`;
+  else if(days<=10)daysHTML=`<span class="days-chip days-warn" style="font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--yellow-b);background:var(--yellow-l);color:var(--yellow)">残${days}日</span>`;
+  else daysHTML=`<span class="days-chip days-ok" style="font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--green-b);background:var(--green-l);color:var(--green)">残${days}日</span>`;
+  const membersHTML=(p.members||[]).map(m=>`<span class="member-chip">${esc(m)}</span>`).join('');
+  area.innerHTML=`<div class="prog-card">
+    <div class="prog-card-top">
+      <div>
+        <div class="prog-card-client">${esc(p.client||'')}</div>
+        <div class="prog-card-name">${esc(p.name)}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap">
+          ${daysHTML}
+          ${p.pm?`<span style="font-size:11px;color:#64748b">工程担当：${esc(p.pm)}</span>`:''}
+        </div>
+        ${membersHTML?`<div class="member-chips" style="margin-top:5px">${membersHTML}</div>`:''}
+      </div>
+      <div style="text-align:right">
+        <div class="prog-card-pct" style="color:${progColor(pct)}">${pct}%</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:2px">KPI達成率</div>
+      </div>
+    </div>
+    <div class="prog-bar-lg"><div class="prog-fill-lg" style="width:${pct}%;background:${progColor(pct)}"></div></div>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:12px">${doneW}/${totalW} 比重完了${items.length?` / ${items.filter(k=>k.done).length}/${items.length}タスク`:''}${p.autoProgress?` <span style="color:var(--blue)">（自動更新中）</span>`:''}</div>
+    <ul class="kpi-list">${kpiHTML||'<li style="color:#94a3b8;font-size:13px;padding:8px 0">KPI（タスク）を追加してください</li>'}</ul>
+    <div class="add-kpi-row">
+      <input class="add-kpi-inp" type="text" id="kpi-inp-${id}" placeholder="KPI・タスク名を入力"/>
+      <input class="add-kpi-weight" type="number" id="kpi-w-${id}" placeholder="比重" value="1" min="1" max="10"/>
+      <button class="add-kpi-btn" onclick="addKpi('${id}')">追加</button>
+    </div>
+    <div style="margin-top:12px;display:flex;align-items:center;gap:8px">
+      <label style="font-size:12px;color:#64748b;display:flex;align-items:center;gap:5px;cursor:pointer">
+        <input type="checkbox" ${p.autoProgress?'checked':''} onchange="toggleAutoProgress('${id}',this.checked)" style="width:auto;margin-bottom:0"/>
+        KPI完了率で進捗を自動更新する
+      </label>
+    </div>
+  </div>`;
+};
+window.addKpi=(projId)=>{
+  const inp=document.getElementById(`kpi-inp-${projId}`);
+  const wInp=document.getElementById(`kpi-w-${projId}`);
+  const text=inp?.value.trim();
+  if(!text)return;
+  const weight=parseInt(wInp?.value)||1;
+  const kpi=kpiData[projId]||{projId,items:[]};
+  kpi.items=[...(kpi.items||[]),{id:uid(),text,done:false,weight}];
+  saveKpi(projId,kpi);
+  if(inp)inp.value='';
+  if(wInp)wInp.value='1';
+};
+window.toggleKpi=(projId,kpiId)=>{
+  const kpi=kpiData[projId];if(!kpi)return;
+  const item=kpi.items.find(x=>x.id===kpiId);if(!item)return;
+  item.done=!item.done;
+  saveKpi(projId,kpi);
+};
+window.delKpi=(projId,kpiId)=>{
+  const kpi=kpiData[projId];if(!kpi)return;
+  kpi.items=kpi.items.filter(x=>x.id!==kpiId);
+  saveKpi(projId,kpi);
+};
+window.toggleAutoProgress=(projId,val)=>{
+  const p=projItems.find(x=>x.id===projId);if(!p)return;
+  p.autoProgress=val;
+  saveProjItem(p);
+  if(val)syncKpiToProj();
+};
+
+// ─── タスク管理 ───
+function getFiltered(){
+  const fa=document.getElementById('filter-assignee')?.value||'';
+  if(!fa)return[...tasks];
+  return tasks.filter(t=>(t.subtasks||[]).some(s=>s.assignee===fa));
+}
+function getSorted(){
+  const arr=getFiltered();
+  if(currentSort==='name')return arr.sort((a,b)=>(a.project||'').localeCompare(b.project||'','ja'));
+  if(currentSort==='deadline')return arr.sort((a,b)=>{if(!a.deadline&&!b.deadline)return 0;if(!a.deadline)return 1;if(!b.deadline)return -1;return a.deadline.localeCompare(b.deadline);});
+  return arr.sort((a,b)=>(ST_ORD[a.status]||0)-(ST_ORD[b.status]||0));
+}
+window.setSort=(t,el)=>{currentSort=t;document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');renderTasks();};
+function updateStats(){
+  const arr=getFiltered();
+  document.getElementById('s-total').textContent=arr.length;
+  document.getElementById('s-inprog').textContent=arr.filter(t=>!['done','deliver','invoice'].includes(t.status)).length;
+  document.getElementById('s-done').textContent=arr.filter(t=>t.status==='done').length;
+  document.getElementById('s-over').textContent=arr.filter(t=>t.deadline&&isOver(t.deadline)&&t.status!=='done').length;
+}
+function taskCardHTML(t){
+  const sc=sCls(t.status),subs=t.subtasks||[],prog=calcProg(t),dl=fmtD(t.deadline);
+  return`<div class="task-card ${sc}">
+    <div class="tc-top">
+      <div class="tc-left">
+        ${t.project?`<div class="tc-project">${esc(t.project)}</div>`:''}
+        <div class="tc-name">${esc(t.name)}</div>
+      </div>
+      <div class="tc-right">
+        <span class="tc-badge ${sc}" onclick="cycleStatus('${t.id}')" title="クリックでステータス変更">${sLbl(t.status)}</span>
+        ${dl?`<span class="date-tag ${dtCls(t.deadline)}">${dl}</span>`:''}
+      </div>
+    </div>
+    ${subs.length?`<ul class="subtask-list">${subs.map(s=>{const sd=fmtD(s.dueDate);return`<li class="subtask-item${s.done?' done':''}" onclick="toggleSub('${t.id}','${s.id}')">
+      <span class="sub-chk">${s.done?'✓':''}</span>
+      <span class="sub-body"><span class="sub-txt">${esc(s.text)}</span>${s.assignee?`<span class="sub-assignee">${esc(s.assignee)}</span>`:''}</span>
+      <span class="sub-right">${sd?`<span class="date-tag ${dtCls(s.dueDate)}">${sd}</span>`:''}</span>
+    </li>`;}).join('')}</ul>
+    <div class="tc-prog"><div class="tc-prog-fill" style="width:${prog}%"></div></div>`:''}
+    <div class="tc-footer">
+      <span class="tc-meta">${subs.length?`${subs.filter(s=>s.done).length}/${subs.length}完了`:'サブタスクなし'}</span>
+      <div class="tc-acts">
+        <button class="act-btn act-edit" onclick="openEdit('${t.id}')">編集</button>
+        <button class="act-btn act-del" onclick="deleteTask('${t.id}')">削除</button>
+      </div>
+    </div>
+  </div>`;
+}
+function renderTasks(){
+  const list=document.getElementById('task-list');if(!list)return;
+  updateStats();
+  const sel=document.getElementById('filter-assignee');
+  if(sel){const c=sel.value;sel.innerHTML='<option value="">全員</option>'+assignees.map(a=>`<option value="${esc(a)}"${a===c?' selected':''}>${esc(a)}</option>`).join('');}
+  const sorted=getSorted();
+  if(!sorted.length){list.innerHTML='<div class="loading">タスクがありません</div>';return;}
+  let html='';
+  if(currentSort==='status'){
+    STATUSES.forEach(s=>{
+      const grp=sorted.filter(t=>t.status===s.id);if(!grp.length)return;
+      html+=`<div class="group-wrap"><div class="group-hd"><span class="group-badge ${s.cls}">${s.label}</span><span class="group-count">${grp.length}件</span></div>`;
+      grp.forEach(t=>{html+=taskCardHTML(t);});html+='</div>';
+    });
+  }else{sorted.forEach(t=>{html+=taskCardHTML(t);});}
+  list.innerHTML=html;
+}
+function renderBoard(){
+  const board=document.getElementById('kanban-board');if(!board)return;
+  let html='';
+  STATUSES.forEach(s=>{
+    const grp=tasks.filter(t=>t.status===s.id);
+    html+=`<div class="kb-col ${s.cls}"><div class="kb-col-hd"><span class="kb-col-title">${s.label}</span><span class="kb-cnt">${grp.length}</span></div><div class="kb-cards">`;
+    grp.forEach(t=>{
+      const members=[...new Set((t.subtasks||[]).filter(s=>s.assignee).map(s=>s.assignee))];
+      const dl=fmtD(t.deadline);
+      html+=`<div class="kb-card ${s.cls}">
+        ${t.project?`<div class="kb-proj">${esc(t.project)}</div>`:''}
+        <div class="kb-name">${esc(t.name)}</div>
+        ${members.length?`<div class="kb-members">${members.map(m=>`<span class="kb-member">${esc(m)}</span>`).join('')}</div>`:''}
+        ${dl?`<div class="kb-dl"><span class="date-tag ${dtCls(t.deadline)}">${dl}</span></div>`:''}
+      </div>`;
+    });
+    html+='</div></div>';
+  });
+  board.innerHTML=html;
+}
+function renderCal(){
+  const title=document.getElementById('cal-title'),grid=document.getElementById('cal-grid');
+  if(!title||!grid)return;
+  title.textContent=`${calYear}年${calMonth+1}月`;
+  const dows=['日','月','火','水','木','金','土'];
+  let html=dows.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  const firstDay=new Date(calYear,calMonth,1).getDay();
+  const lastDate=new Date(calYear,calMonth+1,0).getDate();
+  const prevLast=new Date(calYear,calMonth,0).getDate();
+  const now=new Date();
+  const todayStr=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const byDate={};
+  const add=(date,name,proj,sc,done)=>{if(!date)return;if(!byDate[date])byDate[date]=[];byDate[date].push({name,proj,sc,done});};
+  tasks.forEach(t=>{
+    add(t.deadline,t.name,t.project,sCls(t.status),t.status==='done');
+    (t.subtasks||[]).forEach(s=>add(s.dueDate,s.text,t.name,sCls(t.status),s.done));
+  });
+  for(let i=firstDay-1;i>=0;i--)html+=`<div class="cal-day other"><div class="cal-num">${prevLast-i}</div></div>`;
+  let cells=firstDay;
+  for(let d=1;d<=lastDate;d++){
+    const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday=ds===todayStr,items=byDate[ds]||[];
+    let chips=items.slice(0,3).map(item=>{
+      const cl=item.done?'chip-done':item.sc;
+      const nm=item.name.length>7?item.name.slice(0,7)+'…':item.name;
+      return`<div class="cal-chip ${cl}">${esc(nm)}</div>`;
+    }).join('');
+    if(items.length>3)chips+=`<div class="cal-more">+${items.length-3}件</div>`;
+    html+=`<div class="cal-day${isToday?' today':''}${items.length?' has-tasks':''}" ${items.length?`onclick="openCalDetail('${ds}')"`:''}><div class="cal-num">${d}</div>${chips}</div>`;
+    cells++;
+  }
+  const rem=7-(cells%7);if(rem<7)for(let d=1;d<=rem;d++)html+=`<div class="cal-day other"><div class="cal-num">${d}</div></div>`;
+  grid.innerHTML=html;
+}
+window.calMove=(dir)=>{calMonth+=dir;if(calMonth>11){calMonth=0;calYear++;}if(calMonth<0){calMonth=11;calYear--;}renderCal();};
+window.openCalDetail=(ds)=>{
+  const items=[];
+  tasks.forEach(t=>{
+    if(t.deadline===ds)items.push({name:t.name,proj:t.project,sc:sCls(t.status),done:t.status==='done'});
+    (t.subtasks||[]).forEach(s=>{if(s.dueDate===ds)items.push({name:s.text,proj:t.name,sc:sCls(t.status),done:s.done,assignee:s.assignee});});
+  });
+  const dt=new Date(ds+'T00:00:00');
+  document.getElementById('cal-modal-title').textContent=`${dt.getMonth()+1}月${dt.getDate()}日の締切`;
+  let html='';
+  if(!items.length)html='<p style="color:#94a3b8;font-size:13px;padding:8px 0">この日の締切はありません</p>';
+  else items.forEach(item=>{
+    const cl=item.done?'chip-done':item.sc;
+    html+=`<div class="cal-detail-item"><span class="cal-chip ${cl}" style="flex-shrink:0;white-space:nowrap">${esc(item.proj||'')}</span><span style="flex:1;${item.done?'text-decoration:line-through;color:#94a3b8':''}">${esc(item.name)}</span>${item.assignee?`<span class="sub-assignee">${esc(item.assignee)}</span>`:''}</div>`;
+  });
+  document.getElementById('cal-modal-body').innerHTML=html;
+  document.getElementById('cal-modal').classList.add('open');
+};
+
+window.cycleStatus=(id)=>{
+  const t=tasks.find(x=>x.id===id);if(!t)return;
+  const idx=STATUSES.findIndex(s=>s.id===t.status);
+  t.status=STATUSES[(idx+1)%STATUSES.length].id;saveTask(t);
+};
+window.toggleSub=(tid,sid)=>{
+  const t=tasks.find(x=>x.id===tid);const s=t&&(t.subtasks||[]).find(x=>x.id===sid);if(!s)return;
+  s.done=!s.done;saveTask(t);
+};
+window.deleteTask=(id)=>{const t=tasks.find(x=>x.id===id);if(!t||!confirm(`「${t.name}」を削除しますか？`))return;delTask(id);};
+window.addTask=()=>{
+  const proj=document.getElementById('new-task-project').value;
+  const name=document.getElementById('new-task-name').value.trim();
+  if(!name){alert('タスク名を入力してください');return;}
+  const status=document.getElementById('new-task-status').value;
+  const deadline=document.getElementById('new-task-deadline').value;
+  const rawSubs=document.getElementById('new-task-subs').value.trim();
+  const subtasks=rawSubs?rawSubs.split('\n').filter(l=>l.trim()).map(l=>({id:uid(),text:l.trim(),done:false,assignee:'',dueDate:''})):[];
+  saveTask({id:uid(),project:proj,name,status,deadline,subtasks,createdAt:Date.now()});
+  document.getElementById('new-task-name').value='';
+  document.getElementById('new-task-deadline').value='';
+  document.getElementById('new-task-subs').value='';
+  switchTab('task',document.querySelector('.nb-task'));
+  alert(`「${name}」を追加しました`);
+};
+function buildAssigneeOpts(cur){return'<option value="">担当者なし</option>'+assignees.map(a=>`<option value="${esc(a)}"${a===cur?' selected':''}>${esc(a)}</option>`).join('');}
+window.openEdit=(id)=>{
+  const t=tasks.find(x=>x.id===id);if(!t)return;
+  document.getElementById('edit-id').value=id;
+  const ep=document.getElementById('edit-project');
+  ep.innerHTML='<option value="">-- 案件を選択 --</option>'+projects.map(p=>`<option value="${esc(p)}"${p===t.project?' selected':''}>${esc(p)}</option>`).join('');
+  document.getElementById('edit-name').value=t.name;
+  document.getElementById('edit-status').value=t.status;
+  document.getElementById('edit-deadline').value=t.deadline||'';
+  document.getElementById('edit-subs-list').innerHTML=(t.subtasks||[]).map(s=>`
+    <div class="sub-edit-row" data-id="${s.id}" data-done="${s.done}">
+      <div class="sub-edit-grid">
+        <input type="text" value="${esc(s.text)}" placeholder="サブタスク名" style="margin-bottom:0"/>
+        <select style="margin-bottom:0">${buildAssigneeOpts(s.assignee)}</select>
+      </div>
+      <div class="sub-edit-bottom">
+        <input type="date" value="${s.dueDate||''}" style="margin-bottom:0"/>
+        <button class="rm-btn" onclick="this.closest('.sub-edit-row').remove()">削除</button>
+      </div>
+    </div>`).join('');
+  document.getElementById('edit-modal').classList.add('open');
+};
+window.addEditSub=()=>{
+  const div=document.createElement('div');div.className='sub-edit-row';div.dataset.id=uid();div.dataset.done='false';
+  div.innerHTML=`<div class="sub-edit-grid"><input type="text" placeholder="サブタスク名" style="margin-bottom:0"/><select style="margin-bottom:0">${buildAssigneeOpts('')}</select></div><div class="sub-edit-bottom"><input type="date" style="margin-bottom:0"/><button class="rm-btn" onclick="this.closest('.sub-edit-row').remove()">削除</button></div>`;
+  document.getElementById('edit-subs-list').appendChild(div);
+};
+window.saveEdit=()=>{
+  const id=document.getElementById('edit-id').value;const t=tasks.find(x=>x.id===id);if(!t)return;
+  t.project=document.getElementById('edit-project').value;
+  t.name=document.getElementById('edit-name').value.trim()||t.name;
+  t.status=document.getElementById('edit-status').value;
+  t.deadline=document.getElementById('edit-deadline').value;
+  t.subtasks=Array.from(document.querySelectorAll('#edit-subs-list .sub-edit-row')).map(row=>{
+    const ti=row.querySelector('input[type=text]'),sel=row.querySelector('select'),di=row.querySelector('input[type=date]');
+    if(!ti||!ti.value.trim())return null;
+    return{id:row.dataset.id||uid(),text:ti.value.trim(),done:row.dataset.done==='true',assignee:sel?sel.value:'',dueDate:di?di.value:''};
+  }).filter(Boolean);
+  saveTask(t);closeModal('edit-modal');
+};
+
+// ─── ⑥ 管理設定（カルーセル） ───
+function renderMeta(){
+  renderCarousel('client', projects, delProject);
+  renderCarousel('assignee', assignees, delAssignee);
+  // セレクト更新
+  ['new-task-project','edit-project'].forEach(id=>{
+    const sel=document.getElementById(id);if(!sel)return;
+    const c=sel.value;
+    sel.innerHTML='<option value="">-- 案件を選択 --</option>'+projects.map(p=>`<option value="${esc(p)}"${p===c?' selected':''}>${esc(p)}</option>`).join('');
+  });
+  ['filter-assignee'].forEach(id=>{
+    const sel=document.getElementById(id);if(!sel)return;
+    const c=sel.value;
+    sel.innerHTML='<option value="">全員</option>'+assignees.map(a=>`<option value="${esc(a)}"${a===c?' selected':''}>${esc(a)}</option>`).join('');
+  });
+}
+function renderCarousel(key, items, delFn){
+  const track=document.getElementById(`${key}-carousel-track`);
+  const controls=document.getElementById(`${key}-carousel-controls`);
+  const dotsWrap=document.getElementById(`${key}-dots`);
+  if(!track)return;
+  const pages=Math.max(1,Math.ceil(items.length/ITEMS_PER_PAGE));
+  if(carouselIdx[key]>=pages)carouselIdx[key]=pages-1;
+  // ページ生成
+  let html='';
+  for(let p=0;p<pages;p++){
+    const slice=items.slice(p*ITEMS_PER_PAGE,(p+1)*ITEMS_PER_PAGE);
+    html+=`<div class="carousel-page">${slice.map(item=>`<span class="master-tag">${esc(item)}<button class="del-tag" onclick="${key==='client'?`delProject('${esc(item)}')`:`delAssignee('${esc(item)}')`}">x</button></span>`).join('')}</div>`;
+  }
+  track.innerHTML=html||'<div class="carousel-page"><span style="font-size:12px;color:#94a3b8">まだ登録がありません</span></div>';
+  track.style.transform=`translateX(-${carouselIdx[key]*100}%)`;
+  if(pages>1){
+    controls.style.display='flex';
+    dotsWrap.innerHTML=Array.from({length:pages},(_,i)=>`<span class="c-dot${i===carouselIdx[key]?' active':''}"></span>`).join('');
+    document.getElementById(`${key}-prev`).disabled=carouselIdx[key]===0;
+    document.getElementById(`${key}-next`).disabled=carouselIdx[key]===pages-1;
+  }else{
+    controls.style.display='none';
+  }
+}
+window.carouselMove=(key,dir)=>{
+  const items=key==='client'?projects:assignees;
+  const pages=Math.ceil(items.length/ITEMS_PER_PAGE);
+  carouselIdx[key]=Math.max(0,Math.min(pages-1,carouselIdx[key]+dir));
+  renderCarousel(key,items,null);
+};
+window.addClientMaster=()=>{
+  const v=document.getElementById('new-client-name').value.trim();
+  if(!v||projects.includes(v))return;
+  projects.push(v);saveMeta();renderMeta();
+  document.getElementById('new-client-name').value='';
+};
+window.delProject=(name)=>{projects=projects.filter(p=>p!==name);saveMeta();renderMeta();};
+window.addAssigneeMaster=()=>{
+  const v=document.getElementById('new-assignee-name').value.trim();
+  if(!v||assignees.includes(v))return;
+  assignees.push(v);saveMeta();renderMeta();
+  document.getElementById('new-assignee-name').value='';
+};
+window.delAssignee=(name)=>{assignees=assignees.filter(a=>a!==name);saveMeta();renderMeta();};
+
+// ─── 日報 ───
+window.generateNippo=()=>{
+  const d=document.getElementById('nippo-date').value;
+  const t1=document.getElementById('today-input').value.trim();
+  const t2=document.getElementById('tomorrow-input').value.trim();
+  const memo=document.getElementById('memo-input').value.trim();
+  const ds=d?new Date(d).toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'}):'（日付未設定）';
+  const fmt=t=>t?t.split('\n').map(l=>`　・${l}`).join('\n'):'　（未入力）';
+  let text=`【日報】${ds}\n\n■ 本日の作業内容\n${fmt(t1)}\n\n■ 明日の予定\n${fmt(t2)}\n`;
+  if(memo)text+=`\n■ 特記事項・連絡\n　${memo.split('\n').join('\n　')}\n`;
+  document.getElementById('nippo-output').textContent=text;
+  document.getElementById('nippo-out-wrap').style.display='block';
+};
+window.copyNippo=()=>{
+  const text=document.getElementById('nippo-output').textContent;if(!text)return;
+  navigator.clipboard.writeText(text).then(()=>{const btn=document.getElementById('copy-btn');btn.textContent='コピーしました';setTimeout(()=>btn.textContent='コピー',1500);});
+};
+
+// ─── タブ・モーダル ───
+window.closeModal=(id)=>document.getElementById(id).classList.remove('open');
+window.switchTab=(t,el)=>{
+  ['projects','progress','task','board','calendar','nippo','manage'].forEach(id=>document.getElementById('pane-'+id).classList.toggle('active',id===t));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  if(el&&el.classList)el.classList.add('active');
+  if(t==='calendar')renderCal();
+  if(t==='board')renderBoard();
+  if(t==='progress'){renderProgressSel();renderProgressDetail();}
+  closeMobileMenu();
+};
+window.toggleMobileMenu=()=>{document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebar-overlay').classList.toggle('open');};
+window.closeMobileMenu=()=>{document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebar-overlay').classList.remove('open');};
+
+// ─── 初期化 ───
+document.getElementById('nippo-date').value=new Date().toISOString().split('T')[0];
+await loadMeta();
+</script>
+</body>
+</html>
