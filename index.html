@@ -1874,86 +1874,72 @@ function renderDash(){
   Object.entries(window.casesData||{}).forEach(([k,cs])=>{
     if(cs&&k)caseByNyukinId[k]=cs;
   });
+
   const clientMap={};
   projItems.forEach(p=>{
     if(!p.client)return;
     if(!clientMap[p.client])clientMap[p.client]=[];
     clientMap[p.client].push(p);
   });
+
   const clients=Object.entries(clientMap);
   if(!clients.length){grid.innerHTML='<div style="color:var(--text-muted);padding:40px;text-align:center">案件がありません</div>';return;}
 
   grid.innerHTML=clients.map(([client,projs])=>{
     const activeCount=projs.filter(p=>p.type!=='done'&&p.progStatus!=='complete'&&p.progStatus!=='maintenance').length;
-    const nyukinGroups={};
-    const noNyukin=[];
+
+    // nyukinIdでグループ化（順序を保持）
+    const groups=[];
+    const groupMap={};
     projs.forEach(p=>{
-      if(p.nyukinId&&caseByNyukinId[p.nyukinId]){
-        if(!nyukinGroups[p.nyukinId])nyukinGroups[p.nyukinId]={cs:caseByNyukinId[p.nyukinId],projs:[]};
-        nyukinGroups[p.nyukinId].projs.push(p);
-      } else { noNyukin.push(p); }
+      const key=p.nyukinId||('__no__'+p.id);
+      if(!groupMap[key]){
+        const g={key,nyukinId:p.nyukinId||null,cs:p.nyukinId?caseByNyukinId[p.nyukinId]:null,projs:[]};
+        groupMap[key]=g;
+        groups.push(g);
+      }
+      groupMap[key].projs.push(p);
     });
 
-    // 案件行（nyukinIdグループ）
-    const projRows=[];
-    Object.entries(nyukinGroups).forEach(([nyukinId,group])=>{
-      const cs=group.cs;
-      const avgPct=Math.round(group.projs.reduce((s,p)=>{
+    const sections=groups.map(g=>{
+      // 案件名と進捗を1件ずつ表示
+      const projLines=g.projs.map(p=>{
         const kpiPct=calcKpiPct(p.id);
-        return s+(kpiPct!==null?kpiPct:(PROG_PCT[p.progStatus||'0']||0));
-      },0)/group.projs.length);
-      const names=group.projs.map(p=>esc(p.name)).join(' · ');
-      const barColor=progColor(avgPct);
-      projRows.push(
-        '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0">'+
-          '<div style="flex:1;min-width:0;margin-right:16px">'+
-            '<div style="font-size:13px;font-weight:500;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+names+'</div>'+
-            '<div style="font-size:10px;color:#bbb;margin-top:2px">'+esc(nyukinId)+'</div>'+
-          '</div>'+
-          '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'+
-            '<div style="width:80px;height:5px;background:#eee;border-radius:999px;overflow:hidden">'+
-              '<div style="width:'+avgPct+'%;height:100%;background:'+barColor+';border-radius:999px"></div>'+
+        const pct=kpiPct!==null?kpiPct:(PROG_PCT[p.progStatus||'0']||0);
+        const barColor=progColor(pct);
+        return (
+          '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0">'+
+            '<div style="font-size:13px;font-weight:500;color:var(--text-primary);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:12px">'+esc(p.name)+'</div>'+
+            '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'+
+              '<div style="width:80px;height:5px;background:#eee;border-radius:999px;overflow:hidden">'+
+                '<div style="width:'+pct+'%;height:100%;background:'+barColor+';border-radius:999px"></div>'+
+              '</div>'+
+              '<span style="font-size:12px;font-weight:600;color:'+barColor+';min-width:32px;text-align:right">'+pct+'%</span>'+
             '</div>'+
-            '<span style="font-size:12px;font-weight:600;color:'+barColor+';min-width:34px;text-align:right">'+avgPct+'%</span>'+
+          '</div>'
+        );
+      }).join('');
+
+      // 金額は1回だけ（nyukinIdが設定されている場合）
+      const moneyRow=g.cs?(
+        '<div style="display:flex;gap:8px;padding:10px 0 4px">'+
+          '<div style="flex:1;background:#f8fafc;border-radius:8px;padding:10px 12px;text-align:center">'+
+            '<div style="font-size:9px;color:#999;margin-bottom:3px">見積総額</div>'+
+            '<div style="font-size:16px;font-weight:600;color:var(--text-primary)">'+fmt(g.cs.estimateTotal)+'</div>'+
+          '</div>'+
+          '<div style="flex:1;background:#EFF6FF;border-radius:8px;padding:10px 12px;text-align:center">'+
+            '<div style="font-size:9px;color:#185FA5;margin-bottom:3px">着手金</div>'+
+            '<div style="font-size:16px;font-weight:600;color:#185FA5">'+fmt(g.cs.chakushu)+'</div>'+
+          '</div>'+
+          '<div style="flex:1;background:#ECFDF5;border-radius:8px;padding:10px 12px;text-align:center">'+
+            '<div style="font-size:9px;color:#0F6E56;margin-bottom:3px">残金</div>'+
+            '<div style="font-size:16px;font-weight:600;color:#0F6E56">'+fmt(g.cs.zangaku)+'</div>'+
           '</div>'+
         '</div>'
-      );
-      // 金額サマリーをこの案件グループの下に大きく表示
-      projRows.push(
-        '<div style="display:flex;gap:12px;padding:12px 0 4px;border-bottom:2px solid #f0f0f0;margin-bottom:4px">'+
-          '<div style="flex:1;background:#f8fafc;border-radius:10px;padding:12px 16px;text-align:center">'+
-            '<div style="font-size:10px;color:#999;margin-bottom:4px;letter-spacing:0.3px">見積総額</div>'+
-            '<div style="font-size:18px;font-weight:600;color:var(--text-primary)">'+fmt(cs.estimateTotal)+'</div>'+
-          '</div>'+
-          '<div style="flex:1;background:#EFF6FF;border-radius:10px;padding:12px 16px;text-align:center">'+
-            '<div style="font-size:10px;color:#185FA5;margin-bottom:4px;letter-spacing:0.3px">着手金</div>'+
-            '<div style="font-size:18px;font-weight:600;color:#185FA5">'+fmt(cs.chakushu)+'</div>'+
-          '</div>'+
-          '<div style="flex:1;background:#ECFDF5;border-radius:10px;padding:12px 16px;text-align:center">'+
-            '<div style="font-size:10px;color:#0F6E56;margin-bottom:4px;letter-spacing:0.3px">残金</div>'+
-            '<div style="font-size:18px;font-weight:600;color:#0F6E56">'+fmt(cs.zangaku)+'</div>'+
-          '</div>'+
-        '</div>'
-      );
-    });
-    noNyukin.forEach(p=>{
-      const kpiPct=calcKpiPct(p.id);
-      const pct=kpiPct!==null?kpiPct:(PROG_PCT[p.progStatus||'0']||0);
-      const barColor=progColor(pct);
-      projRows.push(
-        '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0">'+
-          '<div style="flex:1;min-width:0;margin-right:16px">'+
-            '<div style="font-size:13px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.name)+'</div>'+
-          '</div>'+
-          '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'+
-            '<div style="width:80px;height:5px;background:#eee;border-radius:999px;overflow:hidden">'+
-              '<div style="width:'+pct+'%;height:100%;background:'+barColor+';border-radius:999px"></div>'+
-            '</div>'+
-            '<span style="font-size:12px;font-weight:600;color:'+barColor+';min-width:34px;text-align:right">'+pct+'%</span>'+
-          '</div>'+
-        '</div>'
-      );
-    });
+      ):'';
+
+      return '<div style="border-bottom:1px solid #f0f0f0;padding:8px 0 4px">'+projLines+moneyRow+'</div>';
+    }).join('');
 
     return (
       '<div style="background:#fff;border:1px solid #e8e8e8;border-radius:14px;overflow:hidden">'+
@@ -1961,7 +1947,7 @@ function renderDash(){
           '<div style="font-size:15px;font-weight:600;color:var(--text-primary)">'+esc(client)+'</div>'+
           '<div style="font-size:11px;color:#999">進行中 <span style="font-size:14px;font-weight:600;color:var(--text-primary)">'+activeCount+'</span> 件</div>'+
         '</div>'+
-        '<div style="padding:0 20px 16px">'+projRows.join('')+'</div>'+
+        '<div style="padding:0 20px 8px">'+sections+'</div>'+
       '</div>'
     );
   }).join('');
