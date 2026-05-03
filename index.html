@@ -2834,9 +2834,9 @@ function buildGantt(p, kpiItems){
   // 今日のインデックスを取得してスクロール位置を計算
   const todayIdx=days.findIndex(d=>dStr(d)===todayStr);
   // 1セル=28px として今日列へのスクロール位置（ラベル列120px分引く）
-  const scrollToday=todayIdx>0?Math.max(0,(todayIdx-3)*28):0;
+  const scrollToday=todayIdx>=0?todayIdx:0;
 
-  return`<div class="gantt-wrap" data-scroll="${scrollToday}">
+  return`<div class="gantt-wrap" data-today-idx="${scrollToday}">
     <div class="gantt-title">
       ガントチャート
       <span style="font-size:10px;color:#94a3b8;font-weight:400;margin-left:6px">KPIの「編集」で開始日・納期日を設定するとバーが表示されます</span>
@@ -2863,14 +2863,25 @@ function buildGantt(p, kpiItems){
   </div>`;
 }
 
-  // ① ガントを今日の日付位置にスクロール
+
+// ガント：今日の列をビューポート中央に表示
+function scrollGanttToToday(wrap){
+  const scrollDiv = wrap.querySelector('.gantt-scroll-wrap');
+  if(!scrollDiv) return;
+  const todayIdx = parseInt(wrap.dataset.todayIdx||'-1');
+  if(todayIdx < 0) return;
+  const CELL = 28;        // 1セル幅px
+  const LABEL = 150;      // ラベル列幅px
+  const viewW = scrollDiv.clientWidth - LABEL;
+  // 今日列の左端位置 - ビュー幅の半分 = 中央揃え
+  const target = Math.max(0, todayIdx * CELL - Math.floor(viewW / 2));
+  scrollDiv.scrollLeft = target;
+}
+
+  // ① ガントを今日の日付位置にスクロール（初回レンダリング後）
   setTimeout(()=>{
-    document.querySelectorAll('.gantt-wrap').forEach(wrap=>{
-      const scrollTo=parseInt(wrap.dataset.scroll||'0');
-      const scrollDiv=wrap.querySelector('.gantt-scroll-wrap');
-      if(scrollDiv&&scrollTo>0)scrollDiv.scrollLeft=scrollTo;
-    });
-  },50);
+    document.querySelectorAll('.gantt-wrap').forEach(wrap=>scrollGanttToToday(wrap));
+  },80);
 
 window.switchProgTab=(projId, tab, el)=>{
   const card=document.getElementById(`prog-card-${projId}`);
@@ -2883,12 +2894,8 @@ window.switchProgTab=(projId, tab, el)=>{
   if(tab==='gantt'){
     setTimeout(()=>{
       const wrap=target.querySelector('.gantt-wrap');
-      if(wrap){
-        const scrollTo=parseInt(wrap.dataset.scroll||'0');
-        const scrollDiv=wrap.querySelector('.gantt-scroll-wrap');
-        if(scrollDiv&&scrollTo>0)scrollDiv.scrollLeft=scrollTo;
-      }
-    },50);
+      if(wrap) scrollGanttToToday(wrap);
+    },80);
   }
 };
 
@@ -2898,12 +2905,8 @@ window.toggleCollapse=(id)=>{
   renderProgressAll();
   // ①展開後もガントを今日にスクロール
   setTimeout(()=>{
-    document.querySelectorAll('.gantt-wrap').forEach(wrap=>{
-      const scrollTo=parseInt(wrap.dataset.scroll||'0');
-      const scrollDiv=wrap.querySelector('.gantt-scroll-wrap');
-      if(scrollDiv&&scrollTo>0)scrollDiv.scrollLeft=scrollTo;
-    });
-  },80);
+    document.querySelectorAll('.gantt-wrap').forEach(wrap=>scrollGanttToToday(wrap));
+  },100);
 };
 // ─── KPIテンプレート ───
 const KPI_TEMPLATES = {
